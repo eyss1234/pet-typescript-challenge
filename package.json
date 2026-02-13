@@ -1,0 +1,24 @@
+{
+  "name": "typescript-digital-pet-challenge",
+  "version": "1.0.0",
+  "description": "TypeScript coding challenge: Build a digital pet backend",
+  "main": "index.js",
+  "scripts": {
+    "test": "ts-node check-pet.test.ts",
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn digital-pet.ts"
+  },
+  "keywords": [
+    "typescript",
+    "challenge",
+    "coding-challenge"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}

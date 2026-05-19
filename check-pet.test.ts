@@ -1,100 +1,139 @@
-import { Pet } from './pet';
-// import { DigitalPet } from './digital-pet'; // Uncomment this
+import { describe, test, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { DigitalPet } from './digital-pet.js';
 
-interface TestResult {
-  success: boolean;
-  errors: string[];
-  finalStats: { hunger: number; happiness: number; energy: number };
-}
+describe('DigitalPet', () => {
+  let pet: DigitalPet;
 
-async function simulatePetLife(pet: Pet): Promise<TestResult> {
-  const errors: string[] = [];
-  const TICKS = 24;
-  
-  console.log('Starting 24-hour simulation...');
-  console.log('Initial:', pet.getStatus());
+  // ── Action tests (default 10s decay — won't fire during these) ──
 
-  for (let hour = 0; hour < TICKS; hour++) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    const stats = pet.getStatus();
-    
-    try {
-      // Feed when hungry
-      if (hour % 3 === 0 && stats.hunger > 30) await pet.feed();
-      
-      // Stress test: play 5x in a row
-      if (hour === 5 || hour === 12 || hour === 18) {
-        for (let i = 0; i < 5; i++) {
-          try {
-            await pet.play();
-          } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (msg !== "Pet is too tired.") {
-              errors.push(`Hour ${hour + 1}: Wrong error: ${msg}`);
-            }
-            break;
-          }
-        }
+  beforeEach(() => {
+    pet = new DigitalPet();
+  });
+
+  afterEach(() => {
+    pet.destroy();
+  });
+
+  test('starts with default stats of 50', () => {
+    assert.deepStrictEqual(pet.getStatus(), { hunger: 50, happiness: 50, energy: 50 });
+  });
+
+  test('feed() decreases hunger by 10', async () => {
+    await pet.feed();
+    assert.strictEqual(pet.getStatus().hunger, 40);
+  });
+
+  test('feed() does not drop hunger below 0', async () => {
+    for (let i = 0; i < 10; i++) await pet.feed();
+    assert.strictEqual(pet.getStatus().hunger, 0);
+  });
+
+  test('play() increases happiness by 10 and decreases energy by 10', async () => {
+    await pet.play();
+    const s = pet.getStatus();
+    assert.strictEqual(s.happiness, 60);
+    assert.strictEqual(s.energy, 40);
+  });
+
+  test('play() throws "Pet is too tired." when energy < 10', async () => {
+    pet.energy = 5;
+    await assert.rejects(() => pet.play(), { message: 'Pet is too tired.' });
+  });
+
+  test('play() does not change stats when it throws', async () => {
+    pet.energy = 5;
+    try { await pet.play(); } catch { }
+    assert.strictEqual(pet.getStatus().energy, 5);
+    assert.strictEqual(pet.getStatus().happiness, 50);
+  });
+
+  test('sleep() restores energy by 20', async () => {
+    await pet.sleep();
+    assert.strictEqual(pet.getStatus().energy, 70);
+  });
+
+  test('stats stay within 0-100 range', async () => {
+    pet.hunger = 0;
+    await pet.feed();
+    assert.strictEqual(pet.getStatus().hunger, 0);
+
+    pet.happiness = 100;
+    await pet.play();
+    assert.strictEqual(pet.getStatus().happiness, 100);
+
+    pet.energy = 100;
+    await pet.sleep();
+    assert.strictEqual(pet.getStatus().energy, 100);
+  });
+
+  // ── Decay tests (fast interval so ticks actually fire) ──
+
+  describe('stat decay', () => {
+    let decayPet: DigitalPet;
+
+    afterEach(() => {
+      decayPet.destroy();
+    });
+
+    test('stats decay after one tick', async () => {
+      decayPet = new DigitalPet(100);
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const s = decayPet.getStatus();
+      assert.ok(s.hunger > 50, `hunger should be > 50, got ${s.hunger}`);
+      assert.ok(s.happiness < 50, `happiness should be < 50, got ${s.happiness}`);
+      assert.ok(s.energy < 50, `energy should be < 50, got ${s.energy}`);
+    });
+
+    test('multiple decay ticks accumulate', async () => {
+      decayPet = new DigitalPet(50);
+
+      await new Promise((resolve) => setTimeout(resolve, 320));
+
+      const s = decayPet.getStatus();
+      assert.ok(s.hunger >= 65, `hunger should be >= 65, got ${s.hunger}`);
+      assert.ok(s.happiness <= 35, `happiness should be <= 35, got ${s.happiness}`);
+      assert.ok(s.energy <= 35, `energy should be <= 35, got ${s.energy}`);
+    });
+
+    test('decay respects 0-100 bounds', async () => {
+      decayPet = new DigitalPet(50);
+      decayPet.happiness = 2;
+      decayPet.energy = 2;
+      decayPet.hunger = 99;
+
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
+      const s = decayPet.getStatus();
+      assert.strictEqual(s.happiness, 0);
+      assert.strictEqual(s.energy, 0);
+      assert.strictEqual(s.hunger, 100);
+    });
+  });
+
+  // ── 24-hour simulation (24 ticks at fast interval) ──
+
+  describe('24-hour simulation', () => {
+    test('pet survives a 24-tick simulation with care', async () => {
+      const TICK = 100;
+      const simPet = new DigitalPet(TICK);
+
+      for (let tick = 1; tick <= 24; tick++) {
+        await new Promise((resolve) => setTimeout(resolve, TICK));
+
+        if (tick % 2 === 0) await simPet.feed();
+        if (tick % 3 === 0) await simPet.sleep();
+        if (tick % 4 === 0 && simPet.energy >= 10) await simPet.play();
       }
-      
-      // Sleep when tired
-      if (stats.energy < 20) await pet.sleep();
-      
-      // Random play
-      if (hour % 4 === 0 && stats.energy > 15) {
-        try {
-          await pet.play();
-        } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error);
-          if (msg !== "Pet is too tired.") {
-            errors.push(`Hour ${hour + 1}: Wrong error: ${msg}`);
-          }
-        }
-      }
-      
-      // Emergency care
-      if (stats.hunger > 80) await pet.feed();
-      if (stats.energy < 10) await pet.sleep();
-      
-    } catch (error) {
-      errors.push(`Hour ${hour + 1}: ${error}`);
-    }
-    
-    // Check survival
-    if (stats.hunger >= 100) { errors.push('Died: hunger'); break; }
-    if (stats.happiness <= 0) { errors.push('Died: sadness'); break; }
-    if (stats.energy <= 0) { errors.push('Died: exhaustion'); break; }
-  }
-  
-  const finalStats = pet.getStatus();
-  const success = errors.length === 0 && finalStats.hunger < 100 && finalStats.happiness > 0 && finalStats.energy > 0;
-  
-  return { success, errors, finalStats };
-}
 
-async function runTest() {
-  console.log('Digital Pet Test\n');
-  
-  // const pet = new DigitalPet(); // Uncomment this
-  
-  // Uncomment below:
-  /*
-  const result = await simulatePetLife(pet);
-  
-  console.log('\nFinal:', result.finalStats);
-  console.log(result.success ? '✅ PASSED' : '❌ FAILED');
-  
-  if (result.errors.length > 0) {
-    console.log('Errors:');
-    result.errors.forEach(e => console.log(`  - ${e}`));
-  }
-  
-  process.exit(result.success ? 0 : 1);
-  */
-  
-  console.log('TODO: Uncomment import and test code above');
-}
+      const s = simPet.getStatus();
+      assert.ok(s.hunger < 100, `hunger should be < 100, got ${s.hunger}`);
+      assert.ok(s.happiness > 0, `happiness should be > 0, got ${s.happiness}`);
+      assert.ok(s.energy > 0, `energy should be > 0, got ${s.energy}`);
 
-if (require.main === module) runTest();
-
-export { simulatePetLife, TestResult };
+      simPet.destroy();
+    });
+  });
+});

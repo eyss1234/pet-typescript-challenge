@@ -30,12 +30,7 @@ See `pet.ts` for the interface. Use `digital-pet.template.ts` as starter.
 
 ## Running Tests
 
-1. Uncomment lines in `check-pet.test.ts`:
-   - Line 2: `import { DigitalPet } from './digital-pet';`
-   - Line 78: `const pet = new DigitalPet();`
-   - Lines 81-93: Test execution code
-
-2. Run:
+Once `digital-pet.ts` is implemented, run:
 npm test
 
 ## Success Criteria

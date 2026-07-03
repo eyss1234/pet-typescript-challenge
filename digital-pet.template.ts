@@ -8,7 +8,7 @@ export class DigitalPet implements Pet {
   private decayTimer: ReturnType<typeof setInterval> | null = null;
 
   /**
-   * @param decayIntervalMs - How often stats decayes oy, in milliseconds.
+   * @param decayIntervalMs - How often stats decay, in milliseconds.
    *   Defaults to 10_000 (10 seconds) for normal use.
    *   Pass a shorter value (e.g. 100) in tests so decay actually triggers.
    */
